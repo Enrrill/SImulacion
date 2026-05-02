@@ -1,0 +1,7 @@
+Enfermedad,Poblacion,Radio,Prob_Inf,Prob_Inm,Tiempo_Muerte,Sanos,Infectados,Inmunes,Muertos,Dias
+Personalizada,150,30,0.0500,0.0020,450,0,0,26,124,32
+Personalizada,150,30,0.0500,0.0020,450,0,0,29,121,37
+Peste Negra,150,25,0.1500,0.0010,300,0,0,10,140,13
+Peste Negra,150,25,0.1500,0.0010,300,0,0,5,145,18
+Viruela,150,35,0.3000,0.0030,600,0,0,10,140,122
+Gripe Española,150,50,0.4000,0.0080,450,0,0,18,132,163
