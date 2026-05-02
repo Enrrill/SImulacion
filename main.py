@@ -21,7 +21,7 @@ class App:
         self.root.title("Simulación de Epidemia")
         self.root.configure(bg=BG_DARK)
         
-        # Backend Engine
+
         self.sim = Simulation()
         self.particle_ids = []
         self.is_paused = False
@@ -143,7 +143,7 @@ class App:
         
         self.sim.restart(self.val_num_individuals.get())
         
-        # Asignar tiempo de muerte inicial a los infectados
+
         for p in self.sim.population:
             if p.state == INFECTED:
                 p.infect(self.val_death_timer.get())
@@ -158,13 +158,11 @@ class App:
         steps = 1
         delay = 1000 // velocidad
         
-        # Windows Tkinter no puede dibujar a más de ~64 FPS (16ms)
-        # Si se pide más velocidad, calculamos más turnos lógicos por fotograma
         if velocidad > 60:
             delay = 16
             steps = velocidad // 60
             
-        # --- Lógica delegada al Backend ---
+
         for _ in range(steps):
             stats = self.sim.step(
                 radius=self.val_infection_radius.get(),
@@ -176,7 +174,7 @@ class App:
             if not self.sim.is_running:
                 break
         
-        # --- Actualización del Frontend ---
+        
         for i, p in enumerate(self.sim.population):
             pid = self.particle_ids[i]
             self.sim_canvas.coords(pid, p.x - p.radius, p.y - p.radius, p.x + p.radius, p.y + p.radius)
@@ -208,7 +206,6 @@ class App:
         if self.sim.frames_passed % 5 == 0:
             self.draw_graph()
         
-        # Siguiente frame si sigue corriendo
         if self.sim.is_running or self.is_paused:
             self.root.after(delay, self.update)
 

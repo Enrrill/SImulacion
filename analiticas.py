@@ -34,7 +34,6 @@ class AnalyticsApp:
         self.canvas = tk.Canvas(self.main_frame, bg="#11151C", highlightthickness=0)
         self.canvas.pack(fill=tk.BOTH, expand=True, pady=10)
         
-        # Botón para actualizar en vivo
         ttk.Button(self.main_frame, text="↻ Actualizar Datos", command=self.load_data).pack(pady=10)
         
         self.load_data()
@@ -52,7 +51,6 @@ class AnalyticsApp:
                 try:
                     pob = float(row["Poblacion"])
                     if pob == 0: continue
-                    # La llave del grupo ahora usa el nombre de la enfermedad
                     enfermedad = row.get("Enfermedad", "Personalizada")
                     if enfermedad == "Personalizada":
                         key = f"Personalizada\n(R:{row['Radio']} I:{row['Prob_Inf']})"
@@ -85,11 +83,10 @@ class AnalyticsApp:
         group_spacing = min(150, (c_width - 150) / num_groups)
         bar_width = min(max_bar_width, group_spacing / 4)
         
-        # Ejes
+
         self.canvas.create_line(60, c_height-70, c_width-20, c_height-70, fill="white", width=2)
         self.canvas.create_line(60, 20, 60, c_height-70, fill="white", width=2)
         
-        # Marcas de Y
         for i in range(0, 101, 20):
             y = c_height - 70 - (i / 100) * (c_height - 100)
             self.canvas.create_line(55, y, 65, y, fill="white", width=2)
@@ -104,7 +101,6 @@ class AnalyticsApp:
             
             x_center = x_start + i * group_spacing
             
-            # Dibujar Barras
             for j, (name, val) in enumerate([("Sanos", avg_sanos), ("Inmunes", avg_inmunes), ("Muertos", avg_muertos)]):
                 bar_h = (val / 100) * (c_height - 100)
                 bx1 = x_center + (j - 1.5) * bar_width
@@ -114,14 +110,12 @@ class AnalyticsApp:
                 
                 self.canvas.create_rectangle(bx1, by1, bx2, by2, fill=COLORS[name], outline="")
                 
-                if val > 3: # Solo mostrar número si la barra es medianamente visible
+                if val > 3: 
                     self.canvas.create_text((bx1+bx2)/2, by1 - 10, text=f"{val:.1f}%", fill="white", font=("Segoe UI", 9))
             
-            # Etiquetas inferiores del grupo
             label_text = f"{key}\n(Sims: {len(sims)})"
             self.canvas.create_text(x_center, c_height - 25, text=label_text, fill="white", font=("Segoe UI", 10, "bold"), justify="center")
 
-        # Leyenda
         leg_x = c_width - 150
         for i, name in enumerate(["Sanos", "Inmunes", "Muertos"]):
             self.canvas.create_rectangle(leg_x, 20 + i*30, leg_x+15, 35 + i*30, fill=COLORS[name])

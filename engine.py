@@ -9,13 +9,11 @@ class Individual:
         self.state = state
         self.radius = 6
         
-        # Velocidad aleatoria
         angle = random.uniform(0, 2 * math.pi)
         speed = random.uniform(1.5, 3.0)
         self.vx = math.cos(angle) * speed
         self.vy = math.sin(angle) * speed
         
-        # Contadores
         self.death_timer = 0
         self.initial_death_timer = 0
         self.reinfection_prob = 0.0
@@ -86,14 +84,10 @@ class Simulation:
         susceptible_pop = [p for p in self.population if p.state == SUSCEPTIBLE]
         immune_pop = [p for p in self.population if p.state == IMMUNE]
         
-        # Optimización Matemática: 
-        # Usar el cuadrado del radio evita calcular la raíz cuadrada (hipotenusa) que es muy lento
         radius_sq = radius * radius
         
         for inf in infected_pop:
             for sus in susceptible_pop:
-                # Optimización Espacial: Bounding Box Check (AABB)
-                # Solo calcula matemáticas pesadas si están relativamente cerca en X e Y
                 if abs(inf.x - sus.x) <= radius and abs(inf.y - sus.y) <= radius:
                     dx = inf.x - sus.x
                     dy = inf.y - sus.y
@@ -103,7 +97,6 @@ class Simulation:
                             susceptible_pop.remove(sus)
                             
             for imm in immune_pop:
-                # Bounding Box Check para reinfección
                 if abs(inf.x - imm.x) <= radius and abs(inf.y - imm.y) <= radius:
                     dx = inf.x - imm.x
                     dy = inf.y - imm.y

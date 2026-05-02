@@ -1,6 +1,4 @@
-# ==========================================
-# CONSTANTES INICIALES Y COLORES
-# ==========================================
+
 SIM_WIDTH, SIM_HEIGHT = 800, 500
 GRAPH_WIDTH, GRAPH_HEIGHT = 800, 150
 CONTROL_WIDTH = 280
@@ -14,10 +12,10 @@ IMMUNE = 2
 DEAD = 3
 
 COLORS = {
-    SUSCEPTIBLE: "#00A8FF",   # Azul vibrante
-    INFECTED: "#FF4757",      # Rojo coral
-    IMMUNE: "#2ED573",        # Verde neón
-    DEAD: "#747D8C"           # Gris
+    SUSCEPTIBLE: "#00A8FF",   
+    INFECTED: "#FF4757",      
+    IMMUNE: "#2ED573",        
+    DEAD: "#747D8C"           
 }
 
 BG_DARK = "#1E272E"

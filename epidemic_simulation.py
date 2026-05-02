@@ -3,9 +3,7 @@ from tkinter import ttk
 import random
 import math
 
-# ==========================================
-# CONSTANTES INICIALES Y COLORES
-# ==========================================
+
 SIM_WIDTH, SIM_HEIGHT = 800, 500
 GRAPH_WIDTH, GRAPH_HEIGHT = 800, 150
 CONTROL_WIDTH = 280
@@ -19,10 +17,10 @@ IMMUNE = 2
 DEAD = 3
 
 COLORS = {
-    SUSCEPTIBLE: "#00A8FF",   # Azul vibrante
-    INFECTED: "#FF4757",      # Rojo coral
-    IMMUNE: "#2ED573",        # Verde neón
-    DEAD: "#747D8C"           # Gris
+    SUSCEPTIBLE: "#00A8FF",  
+    INFECTED: "#FF4757",      
+    IMMUNE: "#2ED573",        
+    DEAD: "#747D8C"           
 }
 
 BG_DARK = "#1E272E"
@@ -38,13 +36,12 @@ class Individual:
         self.canvas = canvas
         self.app = app
         
-        # Velocidad aleatoria
+   
         angle = random.uniform(0, 2 * math.pi)
         speed = random.uniform(1.5, 3.0)
         self.vx = math.cos(angle) * speed
         self.vy = math.sin(angle) * speed
-        
-        # Contadores
+
         self.death_timer = 0
         self.initial_death_timer = 0
         self.reinfection_prob = 0.0
@@ -102,7 +99,6 @@ class App:
         self.root.title("Simulación de Epidemia")
         self.root.configure(bg=BG_DARK)
         
-        # Configurar estilo ttk para modo oscuro
         style = ttk.Style()
         if "clam" in style.theme_names():
             style.theme_use("clam")
@@ -115,22 +111,17 @@ class App:
         style.map("TButton", background=[("active", "#4CD137")])
         style.configure("TScale", background=BG_PANEL, troughcolor=BG_DARK)
 
-        # --- Variables de Control ---
         self.val_fps = tk.IntVar(value=60)
         self.val_infection_radius = tk.IntVar(value=30)
         self.val_infection_prob = tk.DoubleVar(value=0.05)
         self.val_immunity_prob = tk.DoubleVar(value=0.002)
-        self.val_death_timer = tk.IntVar(value=450)
-        
-        # --- Layout Principal ---
+        self.val_death_timer = tk.Int
         self.main_frame = ttk.Frame(root, style="Dark.TFrame")
         self.main_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
         
-        # Izquierda: Simulación + Gráfica
         self.left_frame = ttk.Frame(self.main_frame, style="Dark.TFrame")
         self.left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        # Canvas de simulación con bordes redondeados (simulado con highlightthickness=0)
         self.sim_canvas = tk.Canvas(self.left_frame, width=SIM_WIDTH, height=SIM_HEIGHT, 
                                   bg="#11151C", highlightthickness=2, highlightbackground="#353b48")
         self.sim_canvas.pack(pady=(0, 10))
@@ -138,12 +129,10 @@ class App:
         self.stats_text = self.sim_canvas.create_text(15, 15, anchor="nw", fill="white", font=("Segoe UI", 12, "bold"))
         self.days_text = self.sim_canvas.create_text(SIM_WIDTH - 15, 15, anchor="ne", fill="white", font=("Segoe UI", 12, "bold"))
         
-        # Canvas de gráfica
         self.graph_canvas = tk.Canvas(self.left_frame, width=GRAPH_WIDTH, height=GRAPH_HEIGHT, 
                                     bg="#11151C", highlightthickness=2, highlightbackground="#353b48")
         self.graph_canvas.pack()
         
-        # Derecha: Controles
         self.control_frame = ttk.Frame(self.main_frame, width=CONTROL_WIDTH)
         self.control_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(15, 0))
         
@@ -155,11 +144,9 @@ class App:
         self.create_slider("Prob. de Inmunidad (%)", self.val_immunity_prob, 0.0001, 0.05, 0.0005)
         self.create_slider("Tiempo de Vida (Frames)", self.val_death_timer, 100, 1200, 10)
         
-        # Botón y contadores
         btn_frame = ttk.Frame(self.control_frame)
         btn_frame.pack(pady=30, fill=tk.X, padx=10)
         
-        # Botones estandar de TTK que se adaptan al tema
         self.btn_restart = ttk.Button(btn_frame, text="▶ REINICIAR", command=self.restart_simulation)
         self.btn_restart.pack(side=tk.LEFT, expand=True, padx=2, fill=tk.X)
         
@@ -175,7 +162,6 @@ class App:
         frame = ttk.Frame(self.control_frame)
         frame.pack(fill=tk.X, padx=15, pady=8)
         
-        # Etiqueta dinámica que muestra el valor
         label_var = tk.StringVar()
         def update_label(*args):
             val = variable.get()
@@ -228,12 +214,10 @@ class App:
         dias = self.frames_passed // 60
         self.sim_canvas.itemconfig(self.days_text, text=f"Días: {dias}")
 
-        # 1. Mover y actualizar estados
         for p in self.population:
             p.move()
             p.update_infection()
             
-        # 2. Lógica de Contagio
         infected_pop = [p for p in self.population if p.state == INFECTED]
         susceptible_pop = [p for p in self.population if p.state == SUSCEPTIBLE]
         immune_pop = [p for p in self.population if p.state == IMMUNE]
@@ -256,7 +240,6 @@ class App:
                         imm.infect()
                         immune_pop.remove(imm)
 
-        # 3. Estadísticas
         stats = {
             SUSCEPTIBLE: len(susceptible_pop),
             INFECTED: len(infected_pop),
@@ -267,7 +250,6 @@ class App:
         stats_str = f"Sanos: {stats[SUSCEPTIBLE]} | Infectados: {stats[INFECTED]} | Inmunes: {stats[IMMUNE]} | Muertos: {stats[DEAD]}"
         self.sim_canvas.itemconfig(self.stats_text, text=stats_str)
         
-        # Comprobar fin de la epidemia
         if stats[INFECTED] == 0:
             self.is_running = False
             vivos = stats[SUSCEPTIBLE] + stats[IMMUNE]
@@ -277,7 +259,6 @@ class App:
             resumen += f"Inmunes: {stats[IMMUNE]}\n"
             resumen += f"Ilesos: {stats[SUSCEPTIBLE]}"
             
-            # Dibujar cuadro de texto central con sombras y bordes redondeados simulados
             cx, cy = SIM_WIDTH//2, SIM_HEIGHT//2
             self.sim_canvas.create_rectangle(cx - 150, cy - 90, cx + 150, cy + 90, fill="#2F3640", outline="#192A56", width=4, tags="dialog")
             self.sim_canvas.create_text(cx, cy, text=resumen, fill="#F5F6FA", font=("Segoe UI", 14, "bold"), justify=tk.CENTER, tags="dialog")
@@ -285,7 +266,6 @@ class App:
             self.draw_graph()
             return
         
-        # 4. Actualizar Historial y Gráfica
         for state in self.history:
             self.history[state].append(stats[state])
             if len(self.history[state]) > self.max_history:
@@ -293,7 +273,6 @@ class App:
                 
         self.draw_graph()
         
-        # 5. Siguiente Frame
         self.root.after(1000 // fps, self.update)
 
     def draw_graph(self):
