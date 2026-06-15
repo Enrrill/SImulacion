@@ -1,127 +1,151 @@
 import tkinter as tk
 from tkinter import ttk
-import csv
-import os
 
-BG_DARK = "#1E272E"
-BG_PANEL = "#2F3640"
-TEXT_COLOR = "#F5F6FA"
-COLORS = {
-    "Sanos": "#00A8FF",   
-    "Inmunes": "#2ED573", 
-    "Muertos": "#747D8C"  
+from src.almacenamiento.manejador_csv import cargar_resultados, RUTA_RESULTADOS
+
+COLORES_GRAFICA = {
+    "Sanos": "#00A8FF",
+    "Inmunes": "#2ED573",
+    "Muertos": "#747D8C",
 }
 
-class AnalyticsApp:
-    def __init__(self, root):
+
+class AplicacionAnaliticas:
+    def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("Analíticas de Simulaciones")
         self.root.geometry("950x650")
-        self.root.configure(bg=BG_DARK)
-        
-        style = ttk.Style()
-        if "clam" in style.theme_names():
-            style.theme_use("clam")
-        style.configure("TFrame", background=BG_DARK)
-        style.configure("TLabel", background=BG_DARK, foreground=TEXT_COLOR, font=("Segoe UI", 12))
-        style.configure("Title.TLabel", font=("Segoe UI", 18, "bold"), padding=10)
-        
-        self.main_frame = ttk.Frame(self.root, padding=20)
-        self.main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        ttk.Label(self.main_frame, text="Promedios de Supervivencia por Configuración (Agrupado por parámetros)", style="Title.TLabel").pack(anchor="w")
-        
-        self.canvas = tk.Canvas(self.main_frame, bg="#11151C", highlightthickness=0)
+        self.root.configure(bg="#1E272E")
+
+        estilo = ttk.Style()
+        if "clam" in estilo.theme_names():
+            estilo.theme_use("clam")
+        estilo.configure("TFrame", background="#1E272E")
+        estilo.configure("TLabel", background="#1E272E", foreground="#F5F6FA", font=("Segoe UI", 12))
+        estilo.configure("Title.TLabel", font=("Segoe UI", 18, "bold"), padding=10)
+
+        marco_ppal = ttk.Frame(self.root, padding=20)
+        marco_ppal.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(
+            marco_ppal,
+            text="Promedios de Supervivencia por Configuración",
+            style="Title.TLabel",
+        ).pack(anchor="w")
+
+        self.canvas = tk.Canvas(marco_ppal, bg="#11151C", highlightthickness=0)
         self.canvas.pack(fill=tk.BOTH, expand=True, pady=10)
-        
-        ttk.Button(self.main_frame, text="↻ Actualizar Datos", command=self.load_data).pack(pady=10)
-        
-        self.load_data()
 
-    def load_data(self):
+        ttk.Button(marco_ppal, text="↻ Actualizar Datos", command=self.cargar_datos).pack(pady=10)
+
+        self.cargar_datos()
+
+    def cargar_datos(self) -> None:
         self.canvas.delete("all")
-        if not os.path.isfile("resultados.csv"):
-            self.canvas.create_text(475, 250, text="No hay simulaciones registradas.\nCorre una simulación hasta el final (hasta que salga el letrero) primero.", fill="white", font=("Segoe UI", 14), justify="center")
+        filas = cargar_resultados(RUTA_RESULTADOS)
+        if not filas:
+            self.canvas.create_text(
+                475, 250,
+                text="No hay simulaciones registradas.\n"
+                     "Corre una simulación hasta el final primero.",
+                fill="white", font=("Segoe UI", 14), justify="center",
+            )
             return
-            
-        groups = {}
-        with open("resultados.csv", "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                try:
-                    pob = float(row["Poblacion"])
-                    if pob == 0: continue
-                    enfermedad = row.get("Enfermedad", "Personalizada")
-                    if enfermedad == "Personalizada":
-                        key = f"Personalizada\n(R:{row['Radio']} I:{row['Prob_Inf']})"
-                    else:
-                        key = enfermedad
-                    
-                    p_sanos = (float(row["Sanos"]) / pob) * 100
-                    p_inmunes = (float(row["Inmunes"]) / pob) * 100
-                    p_muertos = (float(row["Muertos"]) / pob) * 100
-                    
-                    if key not in groups:
-                        groups[key] = []
-                    groups[key].append({"Sanos": p_sanos, "Inmunes": p_inmunes, "Muertos": p_muertos, "Dias": float(row["Dias"])})
-                except Exception as e:
+
+        grupos: dict[str, list[dict[str, float]]] = {}
+        for row in filas:
+            try:
+                pob = float(row["Poblacion"])
+                if pob == 0:
                     continue
-        
-        self.draw_chart(groups)
+                enfermedad = row.get("Enfermedad", "Personalizada")
+                if enfermedad == "Personalizada":
+                    clave = f"Personalizada\n(R:{row['Radio']} I:{row['Prob_Inf']})"
+                else:
+                    clave = enfermedad
 
-    def draw_chart(self, groups):
-        if not groups:
-            self.canvas.create_text(475, 250, text="No se encontraron datos válidos.", fill="white", font=("Segoe UI", 14))
+                p_sanos = (float(row["Sanos"]) / pob) * 100
+                p_inmunes = (float(row["Inmunes"]) / pob) * 100
+                p_muertos = (float(row["Muertos"]) / pob) * 100
+
+                if clave not in grupos:
+                    grupos[clave] = []
+                grupos[clave].append({
+                    "Sanos": p_sanos, "Inmunes": p_inmunes,
+                    "Muertos": p_muertos, "Dias": float(row["Dias"]),
+                })
+            except (ValueError, KeyError):
+                continue
+
+        self.dibujar_grafico(grupos)
+
+    def dibujar_grafico(self, grupos: dict[str, list[dict[str, float]]]) -> None:
+        if not grupos:
+            self.canvas.create_text(
+                475, 250, text="No se encontraron datos válidos.",
+                fill="white", font=("Segoe UI", 14),
+            )
             return
-            
-        self.root.update_idletasks()
-        c_width = self.canvas.winfo_width() or 900
-        c_height = self.canvas.winfo_height() or 500
-        
-        num_groups = len(groups)
-        max_bar_width = 40
-        group_spacing = min(150, (c_width - 150) / num_groups)
-        bar_width = min(max_bar_width, group_spacing / 4)
-        
 
-        self.canvas.create_line(60, c_height-70, c_width-20, c_height-70, fill="white", width=2)
-        self.canvas.create_line(60, 20, 60, c_height-70, fill="white", width=2)
-        
+        self.root.update_idletasks()
+        ancho = self.canvas.winfo_width() or 900
+        alto = self.canvas.winfo_height() or 500
+
+        num_grupos = len(grupos)
+        max_ancho_barra = 40
+        espacio_grupo = min(150, (ancho - 150) / num_grupos)
+        ancho_barra = min(max_ancho_barra, espacio_grupo / 4)
+
+        self.canvas.create_line(60, alto - 70, ancho - 20, alto - 70, fill="white", width=2)
+        self.canvas.create_line(60, 20, 60, alto - 70, fill="white", width=2)
+
         for i in range(0, 101, 20):
-            y = c_height - 70 - (i / 100) * (c_height - 100)
+            y = alto - 70 - (i / 100) * (alto - 100)
             self.canvas.create_line(55, y, 65, y, fill="white", width=2)
             self.canvas.create_text(40, y, text=f"{i}%", fill="white", font=("Segoe UI", 10))
-            
-        x_start = 60 + group_spacing / 2
-        
-        for i, (key, sims) in enumerate(groups.items()):
-            avg_sanos = sum(s["Sanos"] for s in sims) / len(sims)
-            avg_inmunes = sum(s["Inmunes"] for s in sims) / len(sims)
-            avg_muertos = sum(s["Muertos"] for s in sims) / len(sims)
-            
-            x_center = x_start + i * group_spacing
-            
-            for j, (name, val) in enumerate([("Sanos", avg_sanos), ("Inmunes", avg_inmunes), ("Muertos", avg_muertos)]):
-                bar_h = (val / 100) * (c_height - 100)
-                bx1 = x_center + (j - 1.5) * bar_width
-                by1 = c_height - 70 - bar_h
-                bx2 = bx1 + bar_width
-                by2 = c_height - 70
-                
-                self.canvas.create_rectangle(bx1, by1, bx2, by2, fill=COLORS[name], outline="")
-                
-                if val > 3: 
-                    self.canvas.create_text((bx1+bx2)/2, by1 - 10, text=f"{val:.1f}%", fill="white", font=("Segoe UI", 9))
-            
-            label_text = f"{key}\n(Sims: {len(sims)})"
-            self.canvas.create_text(x_center, c_height - 25, text=label_text, fill="white", font=("Segoe UI", 10, "bold"), justify="center")
 
-        leg_x = c_width - 150
-        for i, name in enumerate(["Sanos", "Inmunes", "Muertos"]):
-            self.canvas.create_rectangle(leg_x, 20 + i*30, leg_x+15, 35 + i*30, fill=COLORS[name])
-            self.canvas.create_text(leg_x+25, 28 + i*30, text=name, fill="white", anchor="w", font=("Segoe UI", 10, "bold"))
+        x_inicio = 60 + espacio_grupo / 2
+
+        for i, (clave, sims) in enumerate(grupos.items()):
+            prom_sanos = sum(s["Sanos"] for s in sims) / len(sims)
+            prom_inmunes = sum(s["Inmunes"] for s in sims) / len(sims)
+            prom_muertos = sum(s["Muertos"] for s in sims) / len(sims)
+
+            x_centro = x_inicio + i * espacio_grupo
+
+            for j, (nombre, valor) in enumerate(
+                [("Sanos", prom_sanos), ("Inmunes", prom_inmunes), ("Muertos", prom_muertos)]
+            ):
+                alto_barra = (valor / 100) * (alto - 100)
+                bx1 = x_centro + (j - 1.5) * ancho_barra
+                by1 = alto - 70 - alto_barra
+                bx2 = bx1 + ancho_barra
+                by2 = alto - 70
+
+                self.canvas.create_rectangle(bx1, by1, bx2, by2, fill=COLORES_GRAFICA[nombre], outline="")
+
+                if valor > 3:
+                    self.canvas.create_text(
+                        (bx1 + bx2) / 2, by1 - 10,
+                        text=f"{valor:.1f}%", fill="white", font=("Segoe UI", 9),
+                    )
+
+            texto_etiqueta = f"{clave}\n(Sims: {len(sims)})"
+            self.canvas.create_text(
+                x_centro, alto - 25, text=texto_etiqueta,
+                fill="white", font=("Segoe UI", 10, "bold"), justify="center",
+            )
+
+        leg_x = ancho - 150
+        for i, nombre in enumerate(["Sanos", "Inmunes", "Muertos"]):
+            self.canvas.create_rectangle(leg_x, 20 + i * 30, leg_x + 15, 35 + i * 30, fill=COLORES_GRAFICA[nombre])
+            self.canvas.create_text(
+                leg_x + 25, 28 + i * 30, text=nombre,
+                fill="white", anchor="w", font=("Segoe UI", 10, "bold"),
+            )
+
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = AnalyticsApp(root)
+    app = AplicacionAnaliticas(root)
     root.mainloop()

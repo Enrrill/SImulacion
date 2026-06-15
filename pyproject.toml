@@ -1,0 +1,14 @@
+[project]
+name = "simulacion-epidemia"
+version = "0.2.0"
+description = "Simulación de propagación de epidemias con interfaz gráfica"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["pruebas"]
+python_files = ["prueba_*.py"]
+
+[tool.pyright]
+pythonPath = ".venv/bin/python"
+include = ["."]
+extraPaths = ["."]
