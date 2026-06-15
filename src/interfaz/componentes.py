@@ -8,7 +8,7 @@ from src.configuracion import (
     COLOR_BOTON_WARNING, COLOR_BOTON_WARNING_HOVER,
     COLOR_BOTON_DANGER, COLOR_BOTON_DANGER_HOVER,
     COLOR_BOTON_OUTLINE_BG, COLOR_BOTON_OUTLINE_HOVER,
-    COLOR_SLIDER_TROUGH, COLOR_COMBOBOX_BG, COLOR_CARD_BG,
+    COLOR_SLIDER_TROUGH,
 )
 
 
@@ -24,7 +24,6 @@ class SliderEtiquetado(ttk.Frame):
         self.pack(fill=tk.X, padx=15, pady=5)
 
         self._var_texto = tk.StringVar()
-        self._variable = variable
         self._etiqueta = etiqueta
         self._formato = formato
 
@@ -47,9 +46,13 @@ class SliderEtiquetado(ttk.Frame):
             font=("Segoe UI", 10, "bold"), foreground="#718093",
         ).pack(anchor="w")
 
-        self.scale = ttk.Scale(
+        self.scale = tk.Scale(
             self, variable=variable, from_=minimo, to=maximo,
+            resolution=resolucion,
             orient=tk.HORIZONTAL,
+            bg=FONDO_PANEL, fg=COLOR_TEXTO,
+            troughcolor=COLOR_SLIDER_TROUGH,
+            highlightthickness=0, bd=0,
         )
         self.scale.pack(fill=tk.X, pady=(5, 0))
 
@@ -72,17 +75,6 @@ class SelectorEnfermedad(ttk.Frame):
         super().__init__(master)
         self.configure(style="Dark.TFrame")
         self.pack(pady=(5, 0), fill=tk.X, padx=10)
-
-        estilo = ttk.Style()
-        estilo.configure("Dark.TCombobox",
-                         fieldbackground=COLOR_COMBOBOX_BG,
-                         background=COLOR_COMBOBOX_BG,
-                         foreground=COLOR_TEXTO,
-                         selectbackground=COLOR_COMBOBOX_BG,
-                         selectforeground=COLOR_TEXTO,
-                         arrowcolor=COLOR_TEXTO)
-        estilo.map("Dark.TCombobox",
-                   fieldbackground=[("readonly", COLOR_COMBOBOX_BG)])
 
         ttk.Label(
             self, text=titulo,

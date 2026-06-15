@@ -54,6 +54,15 @@ class Aplicacion:
         estilo.configure("Dia.TLabel",
                          background="#2F3640", foreground=COLOR_TEXTO,
                          font=("Segoe UI", 11, "bold"), padding=(10, 4))
+        estilo.configure("Dark.TCombobox",
+                         fieldbackground=COLOR_COMBOBOX_BG,
+                         background=COLOR_COMBOBOX_BG,
+                         foreground=COLOR_TEXTO,
+                         selectbackground=COLOR_COMBOBOX_BG,
+                         selectforeground=COLOR_TEXTO,
+                         arrowcolor=COLOR_TEXTO)
+        estilo.map("Dark.TCombobox",
+                   fieldbackground=[("readonly", COLOR_COMBOBOX_BG)])
 
     def _crear_barra_estado(self, master: tk.Widget) -> None:
         self._barra = ttk.Frame(master, style="Header.TFrame", height=ALTO_BARRA)
