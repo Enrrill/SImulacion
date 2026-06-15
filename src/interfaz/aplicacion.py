@@ -4,7 +4,8 @@ from tkinter import ttk, messagebox
 from src.configuracion import (
     Estado, COLORES, ConfigSimulacion, PRESETS_ENFERMEDADES,
     ANCHO_SIM, ALTO_SIM, ANCHO_GRAFICO, ALTO_GRAFICO,
-    ANCHO_CONTROL, FONDO_OSCURO, FONDO_PANEL, COLOR_TEXTO, INTERVALO_GRAFICO,
+    ANCHO_CONTROL, ALTO_BARRA, FONDO_OSCURO, FONDO_PANEL, COLOR_TEXTO,
+    INTERVALO_GRAFICO, COLOR_SLIDER_TROUGH, COLOR_COMBOBOX_BG, COLOR_CARD_BG,
 )
 from src.simulacion.motor import MotorSimulacion
 from src.interfaz.componentes import SliderEtiquetado, SelectorEnfermedad, BotoneraControl
@@ -39,10 +40,49 @@ class Aplicacion:
         estilo.configure("Title.TLabel", font=("Segoe UI", 16, "bold"), padding=10)
         estilo.configure("TButton", font=("Segoe UI", 10, "bold"), padding=6)
         estilo.map("TButton", background=[("active", "#4CD137")])
-        estilo.configure("TScale", background=FONDO_PANEL, troughcolor=FONDO_OSCURO)
+        estilo.configure("TScale", background=FONDO_PANEL, troughcolor=COLOR_SLIDER_TROUGH)
+        estilo.configure("Card.TFrame", background=COLOR_CARD_BG)
+        estilo.configure("Vertical.TScrollbar",
+                         background=COLOR_SLIDER_TROUGH,
+                         troughcolor=FONDO_OSCURO,
+                         bordercolor=FONDO_OSCURO,
+                         arrowcolor=COLOR_TEXTO)
+        estilo.configure("Header.TFrame", background=FONDO_PANEL)
+        estilo.configure("HeaderLabel.TLabel",
+                         background=FONDO_PANEL, foreground=COLOR_TEXTO,
+                         font=("Segoe UI", 11, "bold"))
+        estilo.configure("Dia.TLabel",
+                         background="#2F3640", foreground=COLOR_TEXTO,
+                         font=("Segoe UI", 11, "bold"), padding=(10, 4))
+
+    def _crear_barra_estado(self, master: tk.Widget) -> None:
+        self._barra = ttk.Frame(master, style="Header.TFrame", height=ALTO_BARRA)
+        self._barra.pack(fill=tk.X, pady=(0, 5))
+        self._barra.pack_propagate(False)
+
+        self._header_labels: dict[str, tk.Label] = {}
+        self._label_dia = tk.Label(
+            self._barra, text="⏱ DÍA: 0",
+            bg="#2F3640", fg=COLOR_TEXTO,
+            font=("Segoe UI", 11, "bold"), padx=10, pady=2,
+        )
+        self._label_dia.pack(side=tk.RIGHT, padx=(0, 10))
+
+        for estado, texto in [(Estado.SANO, "SANOS"), (Estado.INFECTADO, "INFECTADOS"),
+                              (Estado.INMUNE, "INMUNES"), (Estado.MUERTO, "MUERTOS")]:
+            frame = tk.Frame(self._barra, bg=FONDO_PANEL)
+            frame.pack(side=tk.LEFT, padx=(15, 0))
+            circulo = tk.Label(frame, text="●", fg=COLORES[estado],
+                               bg=FONDO_PANEL, font=("Segoe UI", 14))
+            circulo.pack(side=tk.LEFT)
+            lbl = tk.Label(frame, text=f"{texto}: 0",
+                           bg=FONDO_PANEL, fg=COLOR_TEXTO,
+                           font=("Segoe UI", 11, "bold"))
+            lbl.pack(side=tk.LEFT, padx=(4, 0))
+            self._header_labels[estado] = lbl
 
     def _crear_interfaz(self) -> None:
-        self.val_velocidad = tk.StringVar(value="1x")
+        self.val_velocidad = tk.DoubleVar(value=1.0)
         self.val_num_individuos = tk.IntVar(value=0)
         self.val_infectados_ini = tk.IntVar(value=0)
         self.val_inmunes_ini = tk.IntVar(value=0)
@@ -50,6 +90,7 @@ class Aplicacion:
         self.val_prob_infeccion = tk.DoubleVar(value=0.0)
         self.val_prob_inmunidad = tk.DoubleVar(value=0.0)
         self.val_tiempo_muerte = tk.IntVar(value=0)
+        self.val_max_dias = tk.IntVar(value=0)
 
         marco_ppal = ttk.Frame(self.root, style="Dark.TFrame")
         marco_ppal.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
@@ -57,19 +98,13 @@ class Aplicacion:
         marco_izq = ttk.Frame(marco_ppal, style="Dark.TFrame")
         marco_izq.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
+        self._crear_barra_estado(marco_izq)
+
         self.canvas_sim = tk.Canvas(
             marco_izq, width=ANCHO_SIM, height=ALTO_SIM,
             bg="#11151C", highlightthickness=2, highlightbackground="#353b48",
         )
         self.canvas_sim.pack(pady=(0, 10))
-
-        self.texto_stats = self.canvas_sim.create_text(
-            15, 15, anchor="nw", fill="white", font=("Segoe UI", 12, "bold"),
-        )
-        self.texto_dias = self.canvas_sim.create_text(
-            ANCHO_SIM - 15, 15, anchor="ne", fill="white",
-            font=("Segoe UI", 12, "bold"),
-        )
 
         self.canvas_graf = tk.Canvas(
             marco_izq, width=ANCHO_GRAFICO, height=ALTO_GRAFICO,
@@ -78,45 +113,98 @@ class Aplicacion:
         self.canvas_graf.pack()
         self.grafico = Grafico(self.canvas_graf)
 
-        marco_ctrl = ttk.Frame(marco_ppal, width=ANCHO_CONTROL)
-        marco_ctrl.pack(side=tk.RIGHT, fill=tk.Y, padx=(15, 0))
-        marco_ctrl.pack_propagate(False)
+        ANCHO_SCROLLBAR = 16
+        self._marco_scroll = ttk.Frame(marco_ppal, width=ANCHO_CONTROL, style="Dark.TFrame")
+        self._marco_scroll.pack(side=tk.RIGHT, fill=tk.Y, padx=(15, 0))
+        self._marco_scroll.pack_propagate(False)
 
-        ttk.Label(marco_ctrl, text="PARÁMETROS", style="Title.TLabel").pack(pady=(5, 15))
+        self._scroll_canvas = tk.Canvas(
+            self._marco_scroll, width=ANCHO_CONTROL - ANCHO_SCROLLBAR,
+            bg=FONDO_OSCURO, highlightthickness=0,
+        )
+        self._scrollbar = ttk.Scrollbar(
+            self._marco_scroll, orient="vertical", command=self._scroll_canvas.yview,
+        )
+        self._scroll_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self._scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        SliderEtiquetado(marco_ctrl, "Población Total", self.val_num_individuos, 0, 500, 10)
+        self._marco_ctrl = ttk.Frame(self._scroll_canvas, style="Dark.TFrame")
+        self._marco_ctrl.bind(
+            "<Configure>",
+            lambda e: self._scroll_canvas.configure(
+                scrollregion=self._scroll_canvas.bbox("all"),
+            ),
+        )
+        self._scroll_canvas.create_window(
+            (0, 0), window=self._marco_ctrl, anchor="nw",
+            width=ANCHO_CONTROL - ANCHO_SCROLLBAR,
+        )
+        self._scroll_canvas.configure(yscrollcommand=self._scrollbar.set)
+
+        self._scroll_canvas.bind("<Configure>", lambda e: self._ajustar_scroll())
+
+        card_params = ttk.Frame(self._marco_ctrl, style="Card.TFrame")
+        card_params.pack(fill=tk.X, padx=5, pady=(0, 8))
+
+        ttk.Label(card_params, text="PARÁMETROS", style="Title.TLabel").pack(pady=(5, 5))
+        ttk.Label(
+            card_params, text="CONFIGURACIÓN DE SIMULACIÓN",
+            font=("Segoe UI", 9), foreground="#57606F",
+        ).pack(pady=(0, 5))
+
+        SliderEtiquetado(
+            card_params, "Población Total", self.val_num_individuos, 0, 500, 10,
+            descripcion="Define el número de individuos presentes en el entorno.",
+        )
         self.slider_infectados = SliderEtiquetado(
-            marco_ctrl, "Infectados Iniciales", self.val_infectados_ini, 0, 0, 1,
+            card_params, "Infectados Iniciales", self.val_infectados_ini, 0, 0, 1,
         )
         self.slider_inmunes = SliderEtiquetado(
-            marco_ctrl, "Inmunes Iniciales", self.val_inmunes_ini, 0, 0, 1,
+            card_params, "Inmunes Iniciales", self.val_inmunes_ini, 0, 0, 1,
         )
 
         self.val_num_individuos.trace_add("write", self._actualizar_max_iniciales)
 
-        frame_vel = ttk.Frame(marco_ctrl, style="Dark.TFrame")
-        frame_vel.pack(fill=tk.X, padx=15, pady=8)
-        ttk.Label(frame_vel, text="Velocidad:",
-                  font=("Segoe UI", 10, "bold"), foreground="#718093").pack(anchor="w")
-        sub = tk.Frame(frame_vel, bg=FONDO_PANEL)
-        sub.pack(fill=tk.X, pady=(5, 0))
-        for v in ("1x", "1.5x", "2x"):
-            tk.Radiobutton(sub, text=v, variable=self.val_velocidad, value=v,
-                           bg=FONDO_PANEL, fg=COLOR_TEXTO, selectcolor="#353b48",
-                           activebackground=FONDO_PANEL, activeforeground=COLOR_TEXTO,
-                           bd=0, highlightthickness=0,
-                           font=("Segoe UI", 10, "bold")).pack(side=tk.LEFT, expand=True)
+        SliderEtiquetado(
+            card_params, "Velocidad de Simulación", self.val_velocidad,
+            0.5, 3.0, 0.1, formato="velocidad",
+            descripcion="Ajusta la rapidez con la que transcurre el tiempo y el movimiento.",
+        )
 
-        SliderEtiquetado(marco_ctrl, "Radio de Infección", self.val_radio_infeccion, 0, 100, 1)
-        SliderEtiquetado(marco_ctrl, "Prob. de Infección", self.val_prob_infeccion, 0.0, 1.0, 0.01, formato="porcentaje")
-        SliderEtiquetado(marco_ctrl, "Prob. de Inmunidad", self.val_prob_inmunidad, 0.0, 0.05, 0.0005, formato="porcentaje")
-        SliderEtiquetado(marco_ctrl, "Tiempo de Vida (Frames)", self.val_tiempo_muerte, 0, 1200, 10)
+        SliderEtiquetado(
+            card_params, "Radio de Infección", self.val_radio_infeccion, 0, 100, 1,
+            descripcion="Distancia máxima a la que un infectado puede contagiar a otros.",
+        )
+        SliderEtiquetado(
+            card_params, "Prob. de Infección", self.val_prob_infeccion, 0.0, 1.0, 0.01,
+            formato="porcentaje",
+            descripcion="Probabilidad de que el virus se transmita en cada contacto.",
+        )
+        SliderEtiquetado(
+            card_params, "Prob. de Inmunidad", self.val_prob_inmunidad, 0.0, 0.05, 0.0005,
+            formato="porcentaje",
+            descripcion="Probabilidad de que un individuo se recupere y se vuelva inmune.",
+        )
+        SliderEtiquetado(
+            card_params, "Tiempo de Vida (Frames)", self.val_tiempo_muerte, 0, 1200, 10,
+            descripcion="Duración de la infección antes de que el individuo muera o se recupere.",
+        )
+        SliderEtiquetado(
+            card_params, "Días Máximo", self.val_max_dias, 0, 500, 1,
+            descripcion="Límite de duración de la simulación en días. 0 = sin límite.",
+        )
+
+        ttk.Separator(self._marco_ctrl, orient="horizontal").pack(fill=tk.X, padx=10, pady=4)
+
+        card_act = ttk.Frame(self._marco_ctrl, style="Card.TFrame")
+        card_act.pack(fill=tk.X, padx=5, pady=(0, 8))
 
         self.selector_enfermedad = SelectorEnfermedad(
-            marco_ctrl, al_seleccionar=self._al_seleccionar_enfermedad,
+            card_act, al_seleccionar=self._al_seleccionar_enfermedad,
+            titulo="SELECCIONAR ENFERMEDAD",
         )
         self.botones = BotoneraControl(
-            marco_ctrl,
+            card_act,
             al_iniciar=self._preparar,
             al_comenzar=self._iniciar_simulacion,
             al_volver=self._mostrar_bienvenida,
@@ -124,6 +212,31 @@ class Aplicacion:
             al_nueva_simulacion=self._mostrar_bienvenida,
             al_finalizar=self._finalizar_simulacion,
         )
+
+        self.root.after_idle(self._ajustar_scroll)
+
+    def _on_mousewheel(self, event: tk.Event) -> None:
+        if event.num == 4:
+            self._scroll_canvas.yview_scroll(-1, "units")
+        elif event.num == 5:
+            self._scroll_canvas.yview_scroll(1, "units")
+        else:
+            self._scroll_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def _ajustar_scroll(self) -> None:
+        self.root.update_idletasks()
+        contenido = self._marco_ctrl.winfo_reqheight()
+        visible = self._scroll_canvas.winfo_height()
+        if contenido <= visible:
+            self._scrollbar.pack_forget()
+            self._scroll_canvas.unbind("<MouseWheel>")
+            self._scroll_canvas.unbind("<Button-4>")
+            self._scroll_canvas.unbind("<Button-5>")
+        else:
+            self._scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            self._scroll_canvas.bind("<MouseWheel>", self._on_mousewheel)
+            self._scroll_canvas.bind("<Button-4>", self._on_mousewheel)
+            self._scroll_canvas.bind("<Button-5>", self._on_mousewheel)
 
     def _construir_config(self) -> ConfigSimulacion:
         return ConfigSimulacion(
@@ -135,6 +248,7 @@ class Aplicacion:
             prob_inmunidad=self.val_prob_inmunidad.get(),
             tiempo_muerte=self.val_tiempo_muerte.get(),
             fps=60,
+            max_dias=self.val_max_dias.get(),
         )
 
     def _actualizar_max_iniciales(self, *_):
@@ -164,6 +278,11 @@ class Aplicacion:
         self.canvas_sim.delete("particle", "overlay", "dialog", "welcome")
         self.grafico.limpiar()
         self.particulas_ids = []
+        self._actualizar_header(
+            {Estado.SANO: 0, Estado.INFECTADO: 0,
+             Estado.INMUNE: 0, Estado.MUERTO: 0},
+            0,
+        )
 
         self.canvas_sim.create_text(
             ANCHO_SIM // 2, ALTO_SIM // 2,
@@ -173,12 +292,6 @@ class Aplicacion:
             fill="#718093", font=("Segoe UI", 16, "bold"),
             justify=tk.CENTER, tags="welcome",
         )
-        self.canvas_sim.create_text(
-            ANCHO_SIM // 2, ALTO_SIM - 20,
-            text="Día: 0",
-            fill="#718093", font=("Segoe UI", 12, "bold"), tags="welcome",
-        )
-        self.canvas_sim.itemconfig(self.texto_stats, text="")
 
         self.botones.configurar_fase("listo")
 
@@ -230,26 +343,63 @@ class Aplicacion:
             self.particulas_ids.append(pid)
 
         inicial = self.motor.estado_inicial
-        texto = (
-            "╔══ POBLACIÓN INICIAL (Día 0) ══╗\n\n"
-            f"  Sanos:      {inicial[Estado.SANO]}\n"
-            f"  Infectados: {inicial[Estado.INFECTADO]}\n"
-            f"  Inmunes:    {inicial[Estado.INMUNE]}\n"
-            f"  Muertos:    {inicial[Estado.MUERTO]}\n\n"
-            "Presiona COMENZAR para iniciar la simulación"
-        )
+        cx, cy = ANCHO_SIM // 2, ALTO_SIM // 2
 
+        # overlay oscuro de fondo
         self.canvas_sim.create_rectangle(
             0, 0, ANCHO_SIM, ALTO_SIM,
             fill="#11151C", stipple="gray25", tags="overlay",
         )
-        self.canvas_sim.create_text(
-            ANCHO_SIM // 2, ALTO_SIM // 2,
-            text=texto, fill="white",
-            font=("Segoe UI", 14, "bold"), justify=tk.CENTER, tags="overlay",
+        # sombra de la tarjeta
+        self.canvas_sim.create_rectangle(
+            cx - 190, cy - 145, cx + 190, cy + 145,
+            fill="#0D1117", outline="", tags="overlay",
         )
-        self.canvas_sim.itemconfig(self.texto_stats, text="")
-        self.canvas_sim.itemconfig(self.texto_dias, text="Día: 0")
+        # tarjeta principal
+        self.canvas_sim.create_rectangle(
+            cx - 185, cy - 140, cx + 185, cy + 140,
+            fill="#252C34", outline="#4B7BEC", width=2, tags="overlay",
+        )
+        # título
+        self.canvas_sim.create_text(
+            cx, cy - 115, text="📊 POBLACIÓN INICIAL (Día 0)",
+            fill="#F5F6FA", font=("Segoe UI", 14, "bold"),
+            justify=tk.CENTER, tags="overlay",
+        )
+        # línea separadora
+        self.canvas_sim.create_line(
+            cx - 155, cy - 85, cx + 155, cy - 85,
+            fill="#4B7BEC", width=1, tags="overlay",
+        )
+        # encabezado de tabla
+        self.canvas_sim.create_text(
+            cx - 90, cy - 50, text="Estado", fill="#718093",
+            font=("Segoe UI", 10, "bold"), anchor="w", tags="overlay",
+        )
+        self.canvas_sim.create_text(
+            cx + 90, cy - 50, text="Inicial", fill="#718093",
+            font=("Segoe UI", 10, "bold"), anchor="e", tags="overlay",
+        )
+        # estados
+        y = cy - 25
+        for estado, icono in [(Estado.SANO, "🟦"), (Estado.INFECTADO, "🟥"),
+                               (Estado.INMUNE, "🟩"), (Estado.MUERTO, "⬜")]:
+            self.canvas_sim.create_text(
+                cx - 90, y, text=f"{icono} {estado.name}", fill=COLORES[estado],
+                font=("Segoe UI", 12, "bold"), anchor="w", tags="overlay",
+            )
+            self.canvas_sim.create_text(
+                cx + 90, y, text=str(inicial[estado]), fill=COLOR_TEXTO,
+                font=("Segoe UI", 12, "bold"), anchor="e", tags="overlay",
+            )
+            y += 26
+        # prompt
+        self.canvas_sim.create_text(
+            cx, cy + 105, text="Presiona COMENZAR para iniciar la simulación",
+            fill="#718093", font=("Segoe UI", 11, "bold"),
+            justify=tk.CENTER, tags="overlay",
+        )
+        self._actualizar_header(inicial, 0)
 
         self.fase = "preparado"
         self.botones.configurar_fase("preparado")
@@ -261,11 +411,17 @@ class Aplicacion:
         self.botones.configurar_fase("ejecutando")
         self._bucle_principal()
 
+    def _actualizar_header(self, stats: dict[Estado, int], dias: int) -> None:
+        for estado, conteo in stats.items():
+            self._header_labels[estado].config(text=f"{estado.name}: {conteo}")
+        self._label_dia.config(text=f"⏱ DÍA: {dias}")
+
     def _bucle_principal(self) -> None:
         config = self._construir_config()
 
-        mapa_vel = {"1x": (33, 1), "1.5x": (22, 1), "2x": (16, 1)}
-        demora, pasos = mapa_vel.get(self.val_velocidad.get(), (33, 1))
+        velocidad = self.val_velocidad.get()
+        demora = max(10, int(33 / velocidad))
+        pasos = 1
 
         if not self.pausado:
             for _ in range(pasos):
@@ -282,24 +438,16 @@ class Aplicacion:
             self.canvas_sim.itemconfig(pid, fill=COLORES[ind.estado])
 
         dias = self.motor.frames_transcurridos // 60
-        self.canvas_sim.itemconfig(self.texto_dias, text=f"Días: {dias}")
-
         stats = self.motor.obtener_estadisticas()
-        texto = (
-            f"Sanos: {stats[Estado.SANO]} | "
-            f"Infectados: {stats[Estado.INFECTADO]} | "
-            f"Inmunes: {stats[Estado.INMUNE]} | "
-            f"Muertos: {stats[Estado.MUERTO]}"
-        )
-        self.canvas_sim.itemconfig(self.texto_stats, text=texto)
+        self._actualizar_header(stats, dias)
 
         if (
             not self.motor.ejecutando
             and not self.pausado
-            and stats[Estado.INFECTADO] == 0
             and len(self.canvas_sim.find_withtag("dialog")) == 0
         ):
-            self._mostrar_resultados(config, stats, dias)
+            motivo = "limite" if (config.max_dias > 0 and dias >= config.max_dias) else "extinguida"
+            self._mostrar_resultados(config, stats, dias, motivo)
             return
 
         if self.motor.frames_transcurridos % INTERVALO_GRAFICO == 0:
@@ -311,6 +459,7 @@ class Aplicacion:
     def _mostrar_resultados(
         self, config: ConfigSimulacion,
         stats: dict[Estado, int], dias: int,
+        motivo: str = "extinguida",
     ) -> None:
         guardar_resultado(
             RUTA_RESULTADOS,
@@ -321,25 +470,64 @@ class Aplicacion:
         )
 
         inicial = self.motor.estado_inicial
-        resumen = (
-            f"FIN DE LA EPIDEMIA (Día {dias})\n\n"
-            f"{'':>12} {'Inicial':>8} → {'Final':>8}\n"
-            f"{'Sanos:':>12} {inicial[Estado.SANO]:>8} {stats[Estado.SANO]:>8}\n"
-            f"{'Infectados:':>12} {inicial[Estado.INFECTADO]:>8} {stats[Estado.INFECTADO]:>8}\n"
-            f"{'Inmunes:':>12} {inicial[Estado.INMUNE]:>8} {stats[Estado.INMUNE]:>8}\n"
-            f"{'Muertos:':>12} {inicial[Estado.MUERTO]:>8} {stats[Estado.MUERTO]:>8}"
-        )
 
         cx, cy = ANCHO_SIM // 2, ALTO_SIM // 2
+        # sombra
         self.canvas_sim.create_rectangle(
-            cx - 180, cy - 110, cx + 180, cy + 110,
-            fill="#2F3640", outline="#192A56", width=4, tags="dialog",
+            cx - 205, cy - 130, cx + 205, cy + 130,
+            fill="#0D1117", outline="", tags="dialog",
         )
+        # tarjeta
+        self.canvas_sim.create_rectangle(
+            cx - 200, cy - 125, cx + 200, cy + 125,
+            fill="#252C34", outline="#E74C3C", width=2, tags="dialog",
+        )
+        # título
+        titulos = {
+            "extinguida": f"🏁 EPIDEMIA EXTINGUIDA (Día {dias})",
+            "limite": f"⏰ LÍMITE DE DÍAS ALCANZADO (Día {dias})",
+            "manual": f"⏹ SIMULACIÓN FINALIZADA (Día {dias})",
+        }
         self.canvas_sim.create_text(
-            cx, cy, text=resumen, fill="#F5F6FA",
-            font=("Segoe UI", 13, "bold"),
+            cx, cy - 95, text=titulos.get(motivo, titulos["extinguida"]),
+            fill="#F5F6FA", font=("Segoe UI", 13, "bold"),
             justify=tk.CENTER, tags="dialog",
         )
+        # línea separadora
+        self.canvas_sim.create_line(
+            cx - 170, cy - 70, cx + 170, cy - 70,
+            fill="#E74C3C", width=1, tags="dialog",
+        )
+        # tabla comparativa
+        y = cy - 45
+        self.canvas_sim.create_text(
+            cx - 100, y, text="Estado", fill="#718093",
+            font=("Segoe UI", 10, "bold"), anchor="w", tags="dialog",
+        )
+        self.canvas_sim.create_text(
+            cx + 40, y, text="Inicial", fill="#718093",
+            font=("Segoe UI", 10, "bold"), anchor="e", tags="dialog",
+        )
+        self.canvas_sim.create_text(
+            cx + 130, y, text="Final", fill="#718093",
+            font=("Segoe UI", 10, "bold"), anchor="e", tags="dialog",
+        )
+        y += 25
+        for estado, icono in [(Estado.SANO, "🟦"), (Estado.INFECTADO, "🟥"),
+                               (Estado.INMUNE, "🟩"), (Estado.MUERTO, "⬜")]:
+            self.canvas_sim.create_text(
+                cx - 100, y, text=f"{icono} {estado.name}", fill=COLORES[estado],
+                font=("Segoe UI", 11, "bold"), anchor="w", tags="dialog",
+            )
+            self.canvas_sim.create_text(
+                cx + 40, y, text=str(inicial[estado]), fill=COLOR_TEXTO,
+                font=("Segoe UI", 11), anchor="e", tags="dialog",
+            )
+            self.canvas_sim.create_text(
+                cx + 130, y, text=str(stats[estado]), fill=COLOR_TEXTO,
+                font=("Segoe UI", 11, "bold"), anchor="e", tags="dialog",
+            )
+            y += 26
         self.grafico.actualizar(self.motor.historial, self.motor.num_individuos)
 
         self.fase = "terminado"
@@ -356,7 +544,7 @@ class Aplicacion:
         self.pausado = False
         stats = self.motor.obtener_estadisticas()
         dias = self.motor.frames_transcurridos // 60
-        self._mostrar_resultados(self._construir_config(), stats, dias)
+        self._mostrar_resultados(self._construir_config(), stats, dias, "manual")
 
     def cerrar(self) -> None:
         self.motor.ejecutando = False

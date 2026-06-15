@@ -119,3 +119,42 @@ class TestMotorSimulacion:
         inicial = dict(motor.estado_inicial)
         motor.avanzar(cfg)
         assert motor.estado_inicial == inicial
+
+    def test_max_dias_limita_simulacion(self) -> None:
+        motor = MotorSimulacion()
+        cfg = ConfigSimulacion(
+            num_individuos=100,
+            num_infectados_iniciales=3,
+            radio_infeccion=50,
+            prob_infeccion=0.0,
+            prob_inmunidad=0.0,
+            tiempo_muerte=1000,
+            max_dias=1,
+        )
+        motor.reiniciar(cfg)
+        for _ in range(200):
+            motor.avanzar(cfg)
+            if not motor.ejecutando:
+                break
+        assert not motor.ejecutando
+        assert motor.frames_transcurridos >= 60
+
+    def test_max_dias_cero_es_ilimitado(self) -> None:
+        motor = MotorSimulacion()
+        cfg = ConfigSimulacion(
+            num_individuos=10,
+            num_infectados_iniciales=1,
+            radio_infeccion=200,
+            prob_infeccion=0.0,
+            prob_inmunidad=0.0,
+            tiempo_muerte=1,
+            max_dias=0,
+        )
+        motor.reiniciar(cfg)
+        stats = {}
+        for _ in range(200):
+            stats = motor.avanzar(cfg)
+            if not motor.ejecutando:
+                break
+        assert stats[Estado.INFECTADO] == 0
+        assert not motor.ejecutando

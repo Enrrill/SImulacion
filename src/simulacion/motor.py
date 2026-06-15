@@ -115,6 +115,8 @@ class MotorSimulacion:
 
         if self._conteo[Estado.INFECTADO] == 0:
             self.ejecutando = False
+        if cfg.max_dias > 0 and self.frames_transcurridos >= cfg.max_dias * cfg.fps:
+            self.ejecutando = False
 
         stats = dict(self._conteo)
         for estado in self.historial:
