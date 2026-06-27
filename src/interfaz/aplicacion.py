@@ -26,6 +26,10 @@ class Aplicacion:
         self.pausado = False
         self._enfermedad_actual = "Personalizada"
         self.fase = "listo"
+        self._canvas_sim_ancho = ANCHO_SIM
+        self._canvas_sim_alto = ALTO_SIM
+        self._canvas_graf_ancho = ANCHO_GRAFICO
+        self._canvas_graf_alto = ALTO_GRAFICO
 
         self._configurar_estilo()
         self._crear_interfaz()
@@ -111,16 +115,17 @@ class Aplicacion:
         self._crear_barra_estado(marco_izq)
 
         self.canvas_sim = tk.Canvas(
-            marco_izq, width=ANCHO_SIM, height=ALTO_SIM,
-            bg="#11151C", highlightthickness=2, highlightbackground="#353b48",
+            marco_izq, bg="#11151C", highlightthickness=2, highlightbackground="#353b48",
         )
-        self.canvas_sim.pack(pady=(0, 10))
+        self.canvas_sim.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        self.canvas_sim.bind("<Configure>", self._on_sim_redimensionar)
 
         self.canvas_graf = tk.Canvas(
-            marco_izq, width=ANCHO_GRAFICO, height=ALTO_GRAFICO,
+            marco_izq, height=ALTO_GRAFICO,
             bg="#11151C", highlightthickness=2, highlightbackground="#353b48",
         )
-        self.canvas_graf.pack()
+        self.canvas_graf.pack(fill=tk.X)
+        self.canvas_graf.bind("<Configure>", self._on_graf_redimensionar)
         self.grafico = Grafico(self.canvas_graf)
 
         ANCHO_SCROLLBAR = 16
@@ -162,7 +167,7 @@ class Aplicacion:
             font=("Segoe UI", 9), foreground="#57606F",
         ).pack(pady=(0, 5))
 
-        SliderEtiquetado(
+        self._slider_poblacion = SliderEtiquetado(
             card_params, "Población Total", self.val_num_individuos, 0, 500, 10,
             descripcion="Define el número de individuos presentes en el entorno.",
         )
@@ -181,25 +186,25 @@ class Aplicacion:
             descripcion="Ajusta la rapidez con la que transcurre el tiempo y el movimiento.",
         )
 
-        SliderEtiquetado(
+        self._slider_radio = SliderEtiquetado(
             card_params, "Radio de Infección", self.val_radio_infeccion, 0, 100, 1,
             descripcion="Distancia máxima a la que un infectado puede contagiar a otros.",
         )
-        SliderEtiquetado(
+        self._slider_prob_inf = SliderEtiquetado(
             card_params, "Prob. de Infección", self.val_prob_infeccion, 0.0, 1.0, 0.01,
             formato="porcentaje",
             descripcion="Probabilidad de que el virus se transmita en cada contacto.",
         )
-        SliderEtiquetado(
-            card_params, "Prob. de Inmunidad", self.val_prob_inmunidad, 0.0, 0.05, 0.0005,
+        self._slider_prob_inm = SliderEtiquetado(
+            card_params, "Prob. de Inmunidad", self.val_prob_inmunidad, 0.0, 0.10, 0.001,
             formato="porcentaje",
             descripcion="Probabilidad de que un individuo se recupere y se vuelva inmune.",
         )
-        SliderEtiquetado(
+        self._slider_tiempo_muerte = SliderEtiquetado(
             card_params, "Tiempo de Vida (Frames)", self.val_tiempo_muerte, 0, 1200, 10,
             descripcion="Duración de la infección antes de que el individuo muera o se recupere.",
         )
-        SliderEtiquetado(
+        self._slider_max_dias = SliderEtiquetado(
             card_params, "Días Máximo", self.val_max_dias, 0, 500, 1,
             descripcion="Límite de duración de la simulación en días. 0 = sin límite.",
         )
@@ -248,6 +253,25 @@ class Aplicacion:
             self._scroll_canvas.bind("<Button-4>", self._on_mousewheel)
             self._scroll_canvas.bind("<Button-5>", self._on_mousewheel)
 
+    def _on_sim_redimensionar(self, event: tk.Event) -> None:
+        self._canvas_sim_ancho = event.width
+        self._canvas_sim_alto = event.height
+
+    def _on_graf_redimensionar(self, event: tk.Event) -> None:
+        self._canvas_graf_ancho = event.width
+        self._canvas_graf_alto = event.height
+        self.grafico.redimensionar(event.width, event.height)
+
+    def _habilitar_parametros(self, habilitar: bool) -> None:
+        estado = "normal" if habilitar else "disabled"
+        for s in (
+            self._slider_poblacion, self.slider_infectados, self.slider_inmunes,
+            self._slider_radio, self._slider_prob_inf, self._slider_prob_inm,
+            self._slider_tiempo_muerte, self._slider_max_dias,
+        ):
+            s.scale.config(state=estado)
+        self.selector_enfermedad.combo.config(state=estado)
+
     def _construir_config(self) -> ConfigSimulacion:
         return ConfigSimulacion(
             num_individuos=self.val_num_individuos.get(),
@@ -294,8 +318,10 @@ class Aplicacion:
             0,
         )
 
+        cx = self._canvas_sim_ancho // 2
+        cy = self._canvas_sim_alto // 2
         self.canvas_sim.create_text(
-            ANCHO_SIM // 2, ALTO_SIM // 2,
+            cx, cy,
             text="SIMULACIÓN DE EPIDEMIA\n\n"
                  "Ajusta los parámetros en el panel derecho\n"
                  "y presiona INICIAR para comenzar",
@@ -303,6 +329,7 @@ class Aplicacion:
             justify=tk.CENTER, tags="welcome",
         )
 
+        self._habilitar_parametros(True)
         self.botones.configurar_fase("listo")
 
     def _preparar(self) -> None:
@@ -338,74 +365,75 @@ class Aplicacion:
             )
             return
 
+        self._habilitar_parametros(False)
+
         config = self._construir_config()
         self.motor.reiniciar(config)
 
         self.canvas_sim.delete("particle", "overlay", "dialog", "welcome")
         self.particulas_ids = []
 
+        sx_sim = self._canvas_sim_ancho / ANCHO_SIM
+        sy_sim = self._canvas_sim_alto / ALTO_SIM
+        r_sim = max(3, int(6 * min(sx_sim, sy_sim)))
+
         for ind in self.motor.poblacion:
+            px = ind.x * sx_sim
+            py = ind.y * sy_sim
             pid = self.canvas_sim.create_oval(
-                ind.x - ind.radio, ind.y - ind.radio,
-                ind.x + ind.radio, ind.y + ind.radio,
+                px - r_sim, py - r_sim,
+                px + r_sim, py + r_sim,
                 fill=COLORES[ind.estado], outline="", tags="particle",
             )
             self.particulas_ids.append(pid)
 
         inicial = self.motor.estado_inicial
-        cx, cy = ANCHO_SIM // 2, ALTO_SIM // 2
+        cx_sim = self._canvas_sim_ancho // 2
+        cy_sim = self._canvas_sim_alto // 2
 
-        # overlay oscuro de fondo
         self.canvas_sim.create_rectangle(
-            0, 0, ANCHO_SIM, ALTO_SIM,
+            0, 0, self._canvas_sim_ancho, self._canvas_sim_alto,
             fill="#11151C", stipple="gray25", tags="overlay",
         )
-        # sombra de la tarjeta
         self.canvas_sim.create_rectangle(
-            cx - 190, cy - 145, cx + 190, cy + 145,
+            cx_sim - 190, cy_sim - 145, cx_sim + 190, cy_sim + 145,
             fill="#0D1117", outline="", tags="overlay",
         )
-        # tarjeta principal
         self.canvas_sim.create_rectangle(
-            cx - 185, cy - 140, cx + 185, cy + 140,
+            cx_sim - 185, cy_sim - 140, cx_sim + 185, cy_sim + 140,
             fill="#252C34", outline="#4B7BEC", width=2, tags="overlay",
         )
-        # título
         self.canvas_sim.create_text(
-            cx, cy - 115, text="📊 POBLACIÓN INICIAL (Día 0)",
+            cx_sim, cy_sim - 115, text="📊 POBLACIÓN INICIAL (Día 0)",
             fill="#F5F6FA", font=("Segoe UI", 14, "bold"),
             justify=tk.CENTER, tags="overlay",
         )
-        # línea separadora
         self.canvas_sim.create_line(
-            cx - 155, cy - 85, cx + 155, cy - 85,
+            cx_sim - 155, cy_sim - 85, cx_sim + 155, cy_sim - 85,
             fill="#4B7BEC", width=1, tags="overlay",
         )
-        # encabezado de tabla
         self.canvas_sim.create_text(
-            cx - 90, cy - 50, text="Estado", fill="#718093",
+            cx_sim - 90, cy_sim - 50, text="Estado", fill="#718093",
             font=("Segoe UI", 10, "bold"), anchor="w", tags="overlay",
         )
         self.canvas_sim.create_text(
-            cx + 90, cy - 50, text="Inicial", fill="#718093",
+            cx_sim + 90, cy_sim - 50, text="Inicial", fill="#718093",
             font=("Segoe UI", 10, "bold"), anchor="e", tags="overlay",
         )
-        # estados
-        y = cy - 25
+        y_sim = cy_sim - 25
         for estado, icono in [(Estado.SANO, "🟦"), (Estado.INFECTADO, "🟥"),
                                (Estado.INMUNE, "🟩"), (Estado.MUERTO, "⬜")]:
             self.canvas_sim.create_text(
-                cx - 90, y, text=f"{icono} {estado.name}", fill=COLORES[estado],
+                cx_sim - 90, y_sim, text=f"{icono} {estado.name}", fill=COLORES[estado],
                 font=("Segoe UI", 12, "bold"), anchor="w", tags="overlay",
             )
             self.canvas_sim.create_text(
-                cx + 90, y, text=str(inicial[estado]), fill=COLOR_TEXTO,
+                cx_sim + 90, y_sim, text=str(inicial[estado]), fill=COLOR_TEXTO,
                 font=("Segoe UI", 12, "bold"), anchor="e", tags="overlay",
             )
-            y += 26
-        # prompt
+            y_sim += 26
         self.canvas_sim.create_text(
-            cx, cy + 105, text="Presiona COMENZAR para iniciar la simulación",
+            cx_sim, cy_sim + 105, text="Presiona COMENZAR para iniciar la simulación",
             fill="#718093", font=("Segoe UI", 11, "bold"),
             justify=tk.CENTER, tags="overlay",
         )
@@ -430,8 +458,8 @@ class Aplicacion:
         config = self._construir_config()
 
         velocidad = self.val_velocidad.get()
-        demora = max(10, int(33 / velocidad))
-        pasos = 1
+        demora = 33
+        pasos = max(1, int(velocidad))
 
         if not self.pausado:
             for _ in range(pasos):
@@ -439,11 +467,17 @@ class Aplicacion:
                 if not self.motor.ejecutando:
                     break
 
+        sx_sim = self._canvas_sim_ancho / ANCHO_SIM
+        sy_sim = self._canvas_sim_alto / ALTO_SIM
+        r_sim = max(3, int(6 * min(sx_sim, sy_sim)))
+
         for i, ind in enumerate(self.motor.poblacion):
             pid = self.particulas_ids[i]
+            px = ind.x * sx_sim
+            py = ind.y * sy_sim
             self.canvas_sim.coords(
-                pid, ind.x - ind.radio, ind.y - ind.radio,
-                ind.x + ind.radio, ind.y + ind.radio,
+                pid, px - r_sim, py - r_sim,
+                px + r_sim, py + r_sim,
             )
             self.canvas_sim.itemconfig(pid, fill=COLORES[ind.estado])
 
@@ -461,7 +495,10 @@ class Aplicacion:
             return
 
         if self.motor.frames_transcurridos % INTERVALO_GRAFICO == 0:
-            self.grafico.actualizar(self.motor.historial, self.motor.num_individuos)
+            self.grafico.actualizar(
+                self.motor.historial, self.motor.num_individuos,
+                self._canvas_graf_ancho, self._canvas_graf_alto,
+            )
 
         if self.motor.ejecutando or self.pausado:
             self.root.after(demora, self._bucle_principal)
@@ -493,13 +530,14 @@ class Aplicacion:
 
         inicial = self.motor.estado_inicial
 
-        cx, cy = ANCHO_SIM // 2, ALTO_SIM // 2
+        cx_sim = self._canvas_sim_ancho // 2
+        cy_sim = self._canvas_sim_alto // 2
         self.canvas_sim.create_rectangle(
-            cx - 205, cy - 130, cx + 205, cy + 130,
+            cx_sim - 205, cy_sim - 130, cx_sim + 205, cy_sim + 130,
             fill="#0D1117", outline="", tags="dialog",
         )
         self.canvas_sim.create_rectangle(
-            cx - 200, cy - 125, cx + 200, cy + 125,
+            cx_sim - 200, cy_sim - 125, cx_sim + 200, cy_sim + 125,
             fill="#252C34", outline="#E74C3C", width=2, tags="dialog",
         )
         titulos = {
@@ -508,45 +546,69 @@ class Aplicacion:
             "manual": f"⏹ SIMULACIÓN FINALIZADA (Día {dias})",
         }
         self.canvas_sim.create_text(
-            cx, cy - 95, text=titulos.get(motivo, titulos["extinguida"]),
+            cx_sim, cy_sim - 95, text=titulos.get(motivo, titulos["extinguida"]),
             fill="#F5F6FA", font=("Segoe UI", 13, "bold"),
             justify=tk.CENTER, tags="dialog",
         )
         self.canvas_sim.create_line(
-            cx - 170, cy - 70, cx + 170, cy - 70,
+            cx_sim - 170, cy_sim - 70, cx_sim + 170, cy_sim - 70,
             fill="#E74C3C", width=1, tags="dialog",
         )
-        y = cy - 45
+        y_sim = cy_sim - 45
         self.canvas_sim.create_text(
-            cx - 100, y, text="Estado", fill="#718093",
+            cx_sim - 100, y_sim, text="Estado", fill="#718093",
             font=("Segoe UI", 10, "bold"), anchor="w", tags="dialog",
         )
         self.canvas_sim.create_text(
-            cx + 40, y, text="Inicial", fill="#718093",
+            cx_sim + 40, y_sim, text="Inicial", fill="#718093",
             font=("Segoe UI", 10, "bold"), anchor="e", tags="dialog",
         )
         self.canvas_sim.create_text(
-            cx + 130, y, text="Final", fill="#718093",
+            cx_sim + 130, y_sim, text="Final", fill="#718093",
             font=("Segoe UI", 10, "bold"), anchor="e", tags="dialog",
         )
-        y += 25
+        y_sim += 25
         for estado, icono in [(Estado.SANO, "🟦"), (Estado.INFECTADO, "🟥"),
                                (Estado.INMUNE, "🟩"), (Estado.MUERTO, "⬜")]:
             self.canvas_sim.create_text(
-                cx - 100, y, text=f"{icono} {estado.name}", fill=COLORES[estado],
+                cx_sim - 100, y_sim, text=f"{icono} {estado.name}", fill=COLORES[estado],
                 font=("Segoe UI", 11, "bold"), anchor="w", tags="dialog",
             )
             self.canvas_sim.create_text(
-                cx + 40, y, text=str(inicial[estado]), fill=COLOR_TEXTO,
+                cx_sim + 40, y_sim, text=str(inicial[estado]), fill=COLOR_TEXTO,
                 font=("Segoe UI", 11), anchor="e", tags="dialog",
             )
             self.canvas_sim.create_text(
-                cx + 130, y, text=str(stats[estado]), fill=COLOR_TEXTO,
+                cx_sim + 130, y_sim, text=str(stats[estado]), fill=COLOR_TEXTO,
                 font=("Segoe UI", 11, "bold"), anchor="e", tags="dialog",
             )
-            y += 26
-        self.grafico.actualizar(self.motor.historial, self.motor.num_individuos)
+            y_sim += 26
+        y_sim += 4
+        self.canvas_sim.create_line(
+            cx_sim - 110, y_sim, cx_sim + 140, y_sim,
+            fill="#57606F", width=1, tags="dialog",
+        )
+        y_sim += 20
+        total = self.motor.num_individuos
+        vivos = total - stats[Estado.MUERTO]
+        self.canvas_sim.create_text(
+            cx_sim - 110, y_sim, text="TOTAL", fill="#F5F6FA",
+            font=("Segoe UI", 11, "bold"), anchor="w", tags="dialog",
+        )
+        self.canvas_sim.create_text(
+            cx_sim + 40, y_sim, text=str(total), fill=COLOR_TEXTO,
+            font=("Segoe UI", 11, "bold"), anchor="e", tags="dialog",
+        )
+        self.canvas_sim.create_text(
+            cx_sim + 130, y_sim, text=str(vivos), fill=COLOR_TEXTO,
+            font=("Segoe UI", 11, "bold"), anchor="e", tags="dialog",
+        )
+        self.grafico.actualizar(
+            self.motor.historial, self.motor.num_individuos,
+            self._canvas_graf_ancho, self._canvas_graf_alto,
+        )
 
+        self._habilitar_parametros(True)
         self.fase = "terminado"
         self.botones.configurar_fase("terminado")
 
