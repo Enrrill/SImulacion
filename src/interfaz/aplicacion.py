@@ -1,5 +1,6 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
+from pathlib import Path
 
 from src.configuracion import (
     Estado, COLORES, ConfigSimulacion, PRESETS_ENFERMEDADES,
@@ -10,7 +11,7 @@ from src.configuracion import (
 from src.simulacion.motor import MotorSimulacion
 from src.interfaz.componentes import SliderEtiquetado, SelectorEnfermedad, BotoneraControl
 from src.interfaz.grafico import Grafico
-from src.almacenamiento.manejador_csv import guardar_resultado, RUTA_RESULTADOS
+from src.almacenamiento.manejador_excel import guardar_resultado
 
 
 class Aplicacion:
@@ -470,8 +471,20 @@ class Aplicacion:
         stats: dict[Estado, int], dias: int,
         motivo: str = "extinguida",
     ) -> None:
+        nombre_sugerido = f"simulacion_{self._enfermedad_actual.replace(' ', '_')}.xlsx"
+        ruta = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            filetypes=[("Excel files", "*.xlsx")],
+            initialfile=nombre_sugerido,
+            title="Guardar resultados de la simulación",
+        )
+        if not ruta:
+            self.fase = "terminado"
+            self.botones.configurar_fase("terminado")
+            return
+
         guardar_resultado(
-            RUTA_RESULTADOS,
+            Path(ruta),
             enfermedad=self._enfermedad_actual,
             config=config,
             estadisticas=stats,
@@ -481,17 +494,14 @@ class Aplicacion:
         inicial = self.motor.estado_inicial
 
         cx, cy = ANCHO_SIM // 2, ALTO_SIM // 2
-        # sombra
         self.canvas_sim.create_rectangle(
             cx - 205, cy - 130, cx + 205, cy + 130,
             fill="#0D1117", outline="", tags="dialog",
         )
-        # tarjeta
         self.canvas_sim.create_rectangle(
             cx - 200, cy - 125, cx + 200, cy + 125,
             fill="#252C34", outline="#E74C3C", width=2, tags="dialog",
         )
-        # título
         titulos = {
             "extinguida": f"🏁 EPIDEMIA EXTINGUIDA (Día {dias})",
             "limite": f"⏰ LÍMITE DE DÍAS ALCANZADO (Día {dias})",
@@ -502,12 +512,10 @@ class Aplicacion:
             fill="#F5F6FA", font=("Segoe UI", 13, "bold"),
             justify=tk.CENTER, tags="dialog",
         )
-        # línea separadora
         self.canvas_sim.create_line(
             cx - 170, cy - 70, cx + 170, cy - 70,
             fill="#E74C3C", width=1, tags="dialog",
         )
-        # tabla comparativa
         y = cy - 45
         self.canvas_sim.create_text(
             cx - 100, y, text="Estado", fill="#718093",
