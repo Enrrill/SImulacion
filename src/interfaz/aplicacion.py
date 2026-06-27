@@ -30,6 +30,7 @@ class Aplicacion:
         self._canvas_sim_alto = ALTO_SIM
         self._canvas_graf_ancho = ANCHO_GRAFICO
         self._canvas_graf_alto = ALTO_GRAFICO
+        self._resultado_guardar: dict | None = None
 
         self._configurar_estilo()
         self._crear_interfaz()
@@ -508,36 +509,20 @@ class Aplicacion:
         stats: dict[Estado, int], dias: int,
         motivo: str = "extinguida",
     ) -> None:
-        nombre_sugerido = f"simulacion_{self._enfermedad_actual.replace(' ', '_')}.xlsx"
-        ruta = filedialog.asksaveasfilename(
-            defaultextension=".xlsx",
-            filetypes=[("Excel files", "*.xlsx")],
-            initialfile=nombre_sugerido,
-            title="Guardar resultados de la simulación",
-        )
-        if not ruta:
-            self.fase = "terminado"
-            self.botones.configurar_fase("terminado")
-            return
-
-        guardar_resultado(
-            Path(ruta),
-            enfermedad=self._enfermedad_actual,
-            config=config,
-            estadisticas=stats,
-            dias=dias,
-        )
+        self._resultado_guardar = {
+            "config": config, "stats": stats, "dias": dias,
+        }
 
         inicial = self.motor.estado_inicial
-
         cx_sim = self._canvas_sim_ancho // 2
         cy_sim = self._canvas_sim_alto // 2
+
         self.canvas_sim.create_rectangle(
-            cx_sim - 205, cy_sim - 130, cx_sim + 205, cy_sim + 130,
+            cx_sim - 205, cy_sim - 160, cx_sim + 205, cy_sim + 160,
             fill="#0D1117", outline="", tags="dialog",
         )
         self.canvas_sim.create_rectangle(
-            cx_sim - 200, cy_sim - 125, cx_sim + 200, cy_sim + 125,
+            cx_sim - 200, cy_sim - 155, cx_sim + 200, cy_sim + 155,
             fill="#252C34", outline="#E74C3C", width=2, tags="dialog",
         )
         titulos = {
@@ -546,15 +531,15 @@ class Aplicacion:
             "manual": f"⏹ SIMULACIÓN FINALIZADA (Día {dias})",
         }
         self.canvas_sim.create_text(
-            cx_sim, cy_sim - 95, text=titulos.get(motivo, titulos["extinguida"]),
+            cx_sim, cy_sim - 125, text=titulos.get(motivo, titulos["extinguida"]),
             fill="#F5F6FA", font=("Segoe UI", 13, "bold"),
             justify=tk.CENTER, tags="dialog",
         )
         self.canvas_sim.create_line(
-            cx_sim - 170, cy_sim - 70, cx_sim + 170, cy_sim - 70,
+            cx_sim - 170, cy_sim - 100, cx_sim + 170, cy_sim - 100,
             fill="#E74C3C", width=1, tags="dialog",
         )
-        y_sim = cy_sim - 45
+        y_sim = cy_sim - 75
         self.canvas_sim.create_text(
             cx_sim - 100, y_sim, text="Estado", fill="#718093",
             font=("Segoe UI", 10, "bold"), anchor="w", tags="dialog",
@@ -603,6 +588,37 @@ class Aplicacion:
             cx_sim + 130, y_sim, text=str(vivos), fill=COLOR_TEXTO,
             font=("Segoe UI", 11, "bold"), anchor="e", tags="dialog",
         )
+
+        y_sim += 30
+        btn_x1 = cx_sim - 70
+        btn_x2 = cx_sim + 70
+        btn_y1 = y_sim
+        btn_y2 = y_sim + 32
+        self.canvas_sim.create_rectangle(
+            btn_x1, btn_y1, btn_x2, btn_y2,
+            fill="#4B7BEC", outline="", tags=("dialog", "btn_bg"),
+        )
+        self.canvas_sim.create_text(
+            cx_sim, y_sim + 16, text="💾 GUARDAR",
+            fill="#F5F6FA", font=("Segoe UI", 11, "bold"),
+            tags=("dialog", "btn_txt"),
+        )
+
+        def btn_enter(_):
+            self.canvas_sim.itemconfig("btn_bg", fill="#5B8BFC")
+
+        def btn_leave(_):
+            self.canvas_sim.itemconfig("btn_bg", fill="#4B7BEC")
+
+        def btn_click(_):
+            self.canvas_sim.itemconfig("btn_bg", fill="#4B7BEC")
+            self._guardar_resultados()
+
+        for t in ("btn_bg", "btn_txt"):
+            self.canvas_sim.tag_bind(t, "<Enter>", btn_enter)
+            self.canvas_sim.tag_bind(t, "<Leave>", btn_leave)
+            self.canvas_sim.tag_bind(t, "<Button-1>", btn_click)
+
         self.grafico.actualizar(
             self.motor.historial, self.motor.num_individuos,
             self._canvas_graf_ancho, self._canvas_graf_alto,
@@ -611,6 +627,118 @@ class Aplicacion:
         self._habilitar_parametros(True)
         self.fase = "terminado"
         self.botones.configurar_fase("terminado")
+
+    def _dialogo_guardar_nombre(self) -> str | None:
+        sugerido = f"simulacion_{self._enfermedad_actual.replace(' ', '_')}.xlsx"
+
+        dialogo = tk.Toplevel(self.root)
+        dialogo.title("Guardar Simulación")
+        dialogo.configure(bg=FONDO_OSCURO)
+        dialogo.resizable(False, False)
+        dialogo.transient(self.root)
+        dialogo.wait_visibility()
+        dialogo.grab_set()
+
+        ancho, alto = 420, 200
+        px = self.root.winfo_x() + (self.root.winfo_width() - ancho) // 2
+        py = self.root.winfo_y() + (self.root.winfo_height() - alto) // 2
+        dialogo.geometry(f"{ancho}x{alto}+{px}+{py}")
+
+        tk.Label(
+            dialogo, text="💾 Guardar resultados", bg=FONDO_OSCURO, fg=COLOR_TEXTO,
+            font=("Segoe UI", 13, "bold"),
+        ).pack(pady=(18, 2))
+
+        ttk.Separator(dialogo, orient="horizontal").pack(fill=tk.X, padx=25)
+
+        frame = tk.Frame(dialogo, bg=FONDO_OSCURO)
+        frame.pack(pady=(12, 0), padx=25, fill=tk.X)
+
+        tk.Label(
+            frame, text="Nombre del archivo:", bg=FONDO_OSCURO, fg="#A0AAB5",
+            font=("Segoe UI", 9), anchor="w",
+        ).pack(fill=tk.X)
+
+        var_nombre = tk.StringVar(value=sugerido)
+        entrada = tk.Entry(
+            frame, textvariable=var_nombre, bg="#1E272E", fg=COLOR_TEXTO,
+            insertbackground=COLOR_TEXTO, relief="flat", bd=0,
+            font=("Segoe UI", 11), highlightthickness=2,
+            highlightbackground="#353B48", highlightcolor="#4B7BEC",
+        )
+        entrada.pack(fill=tk.X, pady=(5, 0), ipady=4)
+        entrada.focus_set()
+        entrada.select_range(0, tk.END)
+
+        dir_actual = Path.cwd().as_posix()
+        tk.Label(
+            dialogo, text=f"Se guardará en: {dir_actual}/", bg=FONDO_OSCURO, fg="#57606F",
+            font=("Segoe UI", 8), anchor="w",
+        ).pack(fill=tk.X, padx=25, pady=(4, 0))
+
+        resultado: list[str | None] = [None]
+
+        def accion_guardar() -> None:
+            nombre_final = var_nombre.get().strip()
+            if not nombre_final:
+                return
+            if not nombre_final.endswith(".xlsx"):
+                nombre_final += ".xlsx"
+            resultado[0] = nombre_final
+            dialogo.destroy()
+
+        def accion_cancelar() -> None:
+            dialogo.destroy()
+
+        btn_frame = tk.Frame(dialogo, bg=FONDO_OSCURO)
+        btn_frame.pack(pady=(14, 0))
+
+        btn_cancelar = tk.Button(
+            btn_frame, text="  CANCELAR  ", command=accion_cancelar,
+            bg="#353B48", fg=COLOR_TEXTO, activebackground="#454B58",
+            activeforeground=COLOR_TEXTO, relief="flat", bd=0,
+            font=("Segoe UI", 10, "bold"), cursor="hand2", padx=16, pady=6,
+        )
+        btn_cancelar.pack(side=tk.LEFT, padx=(0, 6))
+
+        btn_guardar = tk.Button(
+            btn_frame, text="  💾 GUARDAR  ", command=accion_guardar,
+            bg="#4B7BEC", fg="white", activebackground="#5B8BFC",
+            activeforeground="white", relief="flat", bd=0,
+            font=("Segoe UI", 10, "bold"), cursor="hand2", padx=16, pady=6,
+        )
+        btn_guardar.pack(side=tk.LEFT, padx=(6, 0))
+
+        dialogo.bind("<Return>", lambda _: accion_guardar())
+        dialogo.bind("<Escape>", lambda _: accion_cancelar())
+
+        btn_cancelar.bind("<Enter>", lambda _: btn_cancelar.config(bg="#454B58"))
+        btn_cancelar.bind("<Leave>", lambda _: btn_cancelar.config(bg="#353B48"))
+        btn_guardar.bind("<Enter>", lambda _: btn_guardar.config(bg="#5B8BFC"))
+        btn_guardar.bind("<Leave>", lambda _: btn_guardar.config(bg="#4B7BEC"))
+
+        self.root.wait_window(dialogo)
+
+        if resultado[0] is None:
+            return None
+        return str(Path.cwd() / resultado[0])
+
+    def _guardar_resultados(self) -> None:
+        datos = self._resultado_guardar
+        if datos is None:
+            return
+
+        ruta = self._dialogo_guardar_nombre()
+        if not ruta:
+            return
+
+        guardar_resultado(
+            Path(ruta),
+            enfermedad=self._enfermedad_actual,
+            config=datos["config"],
+            estadisticas=datos["stats"],
+            dias=datos["dias"],
+        )
 
     def _alternar_pausa(self) -> None:
         if not self.motor.ejecutando:
