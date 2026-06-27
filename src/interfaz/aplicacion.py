@@ -166,7 +166,7 @@ class Aplicacion:
             font=("Segoe UI", 9), foreground="#57606F",
         ).pack(pady=(0, 5))
 
-        SliderEtiquetado(
+        self._slider_poblacion = SliderEtiquetado(
             card_params, "Población Total", self.val_num_individuos, 0, 500, 10,
             descripcion="Define el número de individuos presentes en el entorno.",
         )
@@ -185,25 +185,25 @@ class Aplicacion:
             descripcion="Ajusta la rapidez con la que transcurre el tiempo y el movimiento.",
         )
 
-        SliderEtiquetado(
+        self._slider_radio = SliderEtiquetado(
             card_params, "Radio de Infección", self.val_radio_infeccion, 0, 100, 1,
             descripcion="Distancia máxima a la que un infectado puede contagiar a otros.",
         )
-        SliderEtiquetado(
+        self._slider_prob_inf = SliderEtiquetado(
             card_params, "Prob. de Infección", self.val_prob_infeccion, 0.0, 1.0, 0.01,
             formato="porcentaje",
             descripcion="Probabilidad de que el virus se transmita en cada contacto.",
         )
-        SliderEtiquetado(
+        self._slider_prob_inm = SliderEtiquetado(
             card_params, "Prob. de Inmunidad", self.val_prob_inmunidad, 0.0, 0.10, 0.001,
             formato="porcentaje",
             descripcion="Probabilidad de que un individuo se recupere y se vuelva inmune.",
         )
-        SliderEtiquetado(
+        self._slider_tiempo_muerte = SliderEtiquetado(
             card_params, "Tiempo de Vida (Frames)", self.val_tiempo_muerte, 0, 1200, 10,
             descripcion="Duración de la infección antes de que el individuo muera o se recupere.",
         )
-        SliderEtiquetado(
+        self._slider_max_dias = SliderEtiquetado(
             card_params, "Días Máximo", self.val_max_dias, 0, 500, 1,
             descripcion="Límite de duración de la simulación en días. 0 = sin límite.",
         )
@@ -260,6 +260,16 @@ class Aplicacion:
         self._canvas_graf_ancho = event.width
         self._canvas_graf_alto = event.height
         self.grafico.redimensionar(event.width, event.height)
+
+    def _habilitar_parametros(self, habilitar: bool) -> None:
+        estado = "normal" if habilitar else "disabled"
+        for s in (
+            self._slider_poblacion, self.slider_infectados, self.slider_inmunes,
+            self._slider_radio, self._slider_prob_inf, self._slider_prob_inm,
+            self._slider_tiempo_muerte, self._slider_max_dias,
+        ):
+            s.scale.config(state=estado)
+        self.selector_enfermedad.combo.config(state=estado)
 
     def _construir_config(self) -> ConfigSimulacion:
         return ConfigSimulacion(
@@ -318,6 +328,7 @@ class Aplicacion:
             justify=tk.CENTER, tags="welcome",
         )
 
+        self._habilitar_parametros(True)
         self.botones.configurar_fase("listo")
 
     def _preparar(self) -> None:
@@ -352,6 +363,8 @@ class Aplicacion:
                 "Reduce la cantidad de Infectados o Inmunes iniciales.",
             )
             return
+
+        self._habilitar_parametros(False)
 
         config = self._construir_config()
         self.motor.reiniciar(config)
@@ -444,8 +457,8 @@ class Aplicacion:
         config = self._construir_config()
 
         velocidad = self.val_velocidad.get()
-        demora = max(10, int(33 / velocidad))
-        pasos = 1
+        demora = 33
+        pasos = max(1, int(velocidad))
 
         if not self.pausado:
             for _ in range(pasos):
@@ -557,11 +570,32 @@ class Aplicacion:
                 font=("Segoe UI", 11, "bold"), anchor="e", tags="dialog",
             )
             y_sim += 26
+        y_sim += 4
+        self.canvas_sim.create_line(
+            cx_sim - 110, y_sim, cx_sim + 140, y_sim,
+            fill="#57606F", width=1, tags="dialog",
+        )
+        y_sim += 20
+        total = self.motor.num_individuos
+        vivos = total - stats[Estado.MUERTO]
+        self.canvas_sim.create_text(
+            cx_sim - 110, y_sim, text="TOTAL", fill="#F5F6FA",
+            font=("Segoe UI", 11, "bold"), anchor="w", tags="dialog",
+        )
+        self.canvas_sim.create_text(
+            cx_sim + 40, y_sim, text=str(total), fill=COLOR_TEXTO,
+            font=("Segoe UI", 11, "bold"), anchor="e", tags="dialog",
+        )
+        self.canvas_sim.create_text(
+            cx_sim + 130, y_sim, text=str(vivos), fill=COLOR_TEXTO,
+            font=("Segoe UI", 11, "bold"), anchor="e", tags="dialog",
+        )
         self.grafico.actualizar(
             self.motor.historial, self.motor.num_individuos,
             self._canvas_graf_ancho, self._canvas_graf_alto,
         )
 
+        self._habilitar_parametros(True)
         self.fase = "terminado"
         self.botones.configurar_fase("terminado")
 
