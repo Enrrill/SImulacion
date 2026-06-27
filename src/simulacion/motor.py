@@ -97,7 +97,7 @@ class MotorSimulacion:
                 infectado.x, infectado.y, cfg.radio_infeccion,
             )
             for j in vecinos:
-                if j in recien_infectados:
+                if j == i or j in recien_infectados:
                     continue
                 vecino = self.poblacion[j]
                 if vecino.estado == Estado.SANO:

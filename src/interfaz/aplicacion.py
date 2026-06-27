@@ -460,7 +460,7 @@ class Aplicacion:
 
         velocidad = self.val_velocidad.get()
         demora = 33
-        pasos = max(1, int(velocidad))
+        pasos = max(1, int(velocidad * 2))
 
         if not self.pausado:
             for _ in range(pasos):
@@ -472,15 +472,16 @@ class Aplicacion:
         sy_sim = self._canvas_sim_alto / ALTO_SIM
         r_sim = max(3, int(6 * min(sx_sim, sy_sim)))
 
-        for i, ind in enumerate(self.motor.poblacion):
-            pid = self.particulas_ids[i]
-            px = ind.x * sx_sim
-            py = ind.y * sy_sim
-            self.canvas_sim.coords(
-                pid, px - r_sim, py - r_sim,
-                px + r_sim, py + r_sim,
-            )
-            self.canvas_sim.itemconfig(pid, fill=COLORES[ind.estado])
+        if not self.pausado:
+            for i, ind in enumerate(self.motor.poblacion):
+                pid = self.particulas_ids[i]
+                px = ind.x * sx_sim
+                py = ind.y * sy_sim
+                self.canvas_sim.coords(
+                    pid, px - r_sim, py - r_sim,
+                    px + r_sim, py + r_sim,
+                )
+                self.canvas_sim.itemconfig(pid, fill=COLORES[ind.estado])
 
         dias = self.motor.frames_transcurridos // 60
         stats = self.motor.obtener_estadisticas()
@@ -495,7 +496,7 @@ class Aplicacion:
             self._mostrar_resultados(config, stats, dias, motivo)
             return
 
-        if self.motor.frames_transcurridos % INTERVALO_GRAFICO == 0:
+        if not self.pausado and self.motor.frames_transcurridos % INTERVALO_GRAFICO == 0:
             self.grafico.actualizar(
                 self.motor.historial, self.motor.num_individuos,
                 self._canvas_graf_ancho, self._canvas_graf_alto,
